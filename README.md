@@ -1,6 +1,6 @@
 # AI-Powered Playwright Self-Healing Engine
 
-A Playwright test framework that **fixes its own broken locators at runtime** — so your tests don't fail just because someone renamed a button.
+A Playwright test framework that **fixes its own broken locators at runtime** -> so your tests don't fail just because someone renamed a button.
 
 It uses a three-tier healing strategy: fast string similarity matching first, then an AI-powered healer (OpenAI) as a fallback, and a persistent cache so the same fix is instant next time.
 
@@ -10,7 +10,7 @@ It uses a three-tier healing strategy: fast string similarity matching first, th
 
 ## The Problem
 
-If you've worked in test automation, you know the pain: a developer changes a button label from `"Submit"` to `"Save"`, or swaps an `<a>` tag for a `<button>`, and suddenly 15 tests fail. The app works fine — but your locators are stale.
+If you've worked in test automation, you know the pain: a developer changes a button label from `"Submit"` to `"Save"`, or swaps an `<a>` tag for a `<button>`, and suddenly 15 tests fail. The app works fine -> but your locators are stale.
 
 This engine catches those failures **before the test reports a failure** and attempts to heal them automatically.
 
@@ -66,11 +66,11 @@ Chained locators work too (e.g. `page.locator('#panel').filter({ hasText: 'Foo' 
 
 Here are real examples from actual test runs showing each tier of healing.
 
-### Tier 1 — Fuzzy Match (Free, No AI)
+### Tier 1 -> Fuzzy Match (Free, No AI)
 
 When the locator text is close enough (>= 90% similarity), the engine fixes it instantly using Levenshtein distance. No API calls, no cost.
 
-**Role mismatch** — test says `button`, actual element is a `textbox`:
+**Role mismatch** -> test says `button`, actual element is a `textbox`:
 ```
 🔧 [AutoHeal] click() failed for: button named "Title*"
    ↳ Attempted: getByRole('button', { name: 'Title*', exact: true })
@@ -80,7 +80,7 @@ When the locator text is close enough (>= 90% similarity), the engine fixes it i
    ✅ [AutoHeal] HEALED! Used: getByRole('textbox', { name: 'Title*', exact: true })
 ```
 
-**Wrong role again** — test says `link`, still a `textbox`:
+**Wrong role again** -> test says `link`, still a `textbox`:
 ```
 🔧 [AutoHeal] fill() failed for: link named "Title*"
    ↳ Attempted: getByRole('link', { name: 'Title*', exact: true })
@@ -90,11 +90,11 @@ When the locator text is close enough (>= 90% similarity), the engine fixes it i
    ✅ [AutoHeal] HEALED! Used: getByRole('textbox', { name: 'Title*', exact: true })
 ```
 
-### Tier 2 — AI Healer (For the Tricky Ones)
+### Tier 2 -> AI Healer (For the Tricky Ones)
 
 When the text has changed enough that fuzzy matching can't confidently pick a winner, the engine sends the DOM elements to OpenAI and lets it figure it out.
 
-**Title attribute changed** — someone renamed `"file"` to `"Image"` in the UI:
+**Title attribute changed** -> someone renamed `"file"` to `"Image"` in the UI:
 ```
 🔧 [AutoHeal] click() failed for: title "Some Shipwreck file"
    ↳ Attempted: getByTitle('Some Shipwreck file')
@@ -107,7 +107,7 @@ When the text has changed enough that fuzzy matching can't confidently pick a wi
    ✅ [AutoHeal] HEALED! Used: getByTitle('Some Shipwreck Image', { exact: true })
 ```
 
-**Text content changed** — `"file name"` became `"asset name"`:
+**Text content changed** -> `"file name"` became `"asset name"`:
 ```
 🔧 [AutoHeal] click() failed for: text "Start typing file name..."
    ↳ Attempted: getByText('Start typing file name...')
@@ -120,9 +120,9 @@ When the text has changed enough that fuzzy matching can't confidently pick a wi
    ✅ [AutoHeal] HEALED! Used: getByText('Start typing asset name...', { exact: true })
 ```
 
-### Tier 3 — Healing Cache (Instant on Re-runs)
+### Tier 3 -> Healing Cache (Instant on Re-runs)
 
-Once a locator is healed (by fuzzy or AI), the fix is saved to `.healingCache.json`. Next time the same broken locator is encountered, it's fixed **instantly** — no fuzzy matching, no API calls, zero cost.
+Once a locator is healed (by fuzzy or AI), the fix is saved to `.healingCache.json`. Next time the same broken locator is encountered, it's fixed **instantly** -> no fuzzy matching, no API calls, zero cost.
 
 ```
 🔧 [AutoHeal] click() failed for: button named "Title*"
@@ -144,7 +144,7 @@ Once a locator is healed (by fuzzy or AI), the fix is saved to `.healingCache.js
 
 ## Test Dashboard
 
-After each run, the custom reporter generates a JSON file that powers a React dashboard. It shows pass/fail stats, an AI-generated test summary, failure classification by root cause, and a detailed healing log — so you can see exactly what broke and how it was fixed.
+After each run, the custom reporter generates a JSON file that powers a React dashboard. It shows pass/fail stats, an AI-generated test summary, failure classification by root cause, and a detailed healing log -> so you can see exactly what broke and how it was fixed.
 
 ![Test Dashboard](docs/dashboard-screenshot.png)
 
@@ -157,7 +157,7 @@ Not every failure is a locator problem. Before the engine tries to heal anything
 | Classification | Healable? | Example |
 |---|---|---|
 | Locator Drift | Yes | `"no element matches locator"` |
-| Timing / Race Condition | Maybe | `"timeout exceeded"` — heals only if locator-related |
+| Timing / Race Condition | Maybe | `"timeout exceeded"` -> heals only if locator-related |
 | Overlay / Intercept | No | `"element is intercepted by another element"` |
 | Visibility | No | `"element is not visible"` |
 | Detachment | No | `"element is detached from the DOM"` |
@@ -235,10 +235,10 @@ cd dashboard && npm install && npm run dev
 
 ## Tech Stack
 
-- **Playwright** — browser automation and test runner
-- **OpenAI API** — LLM-powered locator healing and test run summaries
-- **React + Vite** — test results dashboard
-- **Node.js** — runtime
+- **Playwright** -> browser automation and test runner
+- **OpenAI API** -> LLM-powered locator healing and test run summaries
+- **React + Vite** -> test results dashboard
+- **Node.js** -> runtime
 
 ---
 
