@@ -1,88 +1,196 @@
 # AI-Powered Playwright Self-Healing Engine
 
-An intelligent test automation framework that **automatically detects and heals broken locators at runtime** using a three-tier strategy: deterministic fuzzy matching, an LLM-powered healer (OpenAI), and a persistent healing cache.
+A Playwright test framework that **fixes its own broken locators at runtime** — so your tests don't fail just because someone renamed a button.
 
-> **Disclaimer:** This is an independent portfolio project. It is not affiliated with, endorsed by, or connected to any current or former employer.
+It uses a three-tier healing strategy: fast string similarity matching first, then an AI-powered healer (OpenAI) as a fallback, and a persistent cache so the same fix is instant next time.
+
+> **Disclaimer:** This is an independent portfolio/hobby project. It is not affiliated with, endorsed by, or connected to any current or former employer. I just like building things that solve real problems I've dealt with at work.
+
+---
+
+## The Problem
+
+If you've worked in test automation, you know the pain: a developer changes a button label from `"Submit"` to `"Save"`, or swaps an `<a>` tag for a `<button>`, and suddenly 15 tests fail. The app works fine — but your locators are stale.
+
+This engine catches those failures **before the test reports a failure** and attempts to heal them automatically.
 
 ---
 
 ## How It Works
 
-When a Playwright locator fails (e.g. a button was renamed, a role changed, or a typo crept in), the engine intercepts the failure and attempts to fix it **before the test fails:**
-
 ```
-Test action fails
-       │
-       ▼
-┌─────────────────────┐
-│  Failure Classifier  │──── Not a locator issue? → re-throw original error
-│  (pattern-based)     │
-└────────┬────────────┘
-         │ healable
-         ▼
-┌─────────────────────┐
-│   Healing Cache      │──── Previously healed? → use cached fix (instant)
-│   (.healingCache)    │
-└────────┬────────────┘
-         │ cache miss
-         ▼
-┌─────────────────────┐
-│   Fuzzy Matcher      │──── Levenshtein similarity ≥ 90%? → use match
-│   (deterministic)    │
-└────────┬────────────┘
-         │ no fuzzy match
-         ▼
-┌─────────────────────┐
-│   AI Healer (LLM)    │──── Reads accessibility tree / DOM,
-│   (OpenAI gpt-4o)    │     asks AI to pick the best candidate
-└────────┬────────────┘
-         │
-         ▼
-   Retry action with healed locator
-   Log healing event for the reporter
+Test action fails (e.g. click, fill, etc.)
+       |
+       v
++-----------------------+
+|  Failure Classifier   |---- Not a locator issue? --> re-throw (don't waste time)
++-----------+-----------+
+            | looks like locator drift
+            v
++-----------------------+
+|   Healing Cache       |---- Healed this before? --> instant fix, no API call
++-----------+-----------+
+            | cache miss
+            v
++-----------------------+
+|   Fuzzy Matcher       |---- Close enough? (>= 90% string similarity) --> fix it
+|   (Levenshtein)       |     Free. No AI needed.
++-----------+-----------+
+            | no fuzzy match
+            v
++-----------------------+
+|   AI Healer           |---- Reads the live DOM, asks OpenAI to pick
+|   (OpenAI gpt-4o)     |     the best matching element
++-----------+-----------+
+            |
+            v
+   Retry the action with the healed locator
+   Log everything for the reporter + dashboard
 ```
 
-### Supported Locator Types
+### What It Can Heal
 
-The engine wraps and heals all Playwright semantic locators:
-
-| Method | Heals |
+| Locator Method | What Goes Wrong |
 |---|---|
-| `page.getByRole()` | Role mismatches, name typos, renamed buttons/links |
-| `page.getByText()` | Changed text, typos, whitespace differences |
-| `page.getByLabel()` | Label text changes, aria-label drift |
+| `page.getByRole()` | Wrong role, renamed button/link, typos |
+| `page.getByText()` | Changed text, typos, whitespace |
+| `page.getByLabel()` | Label text drift, aria-label changes |
 | `page.getByPlaceholder()` | Placeholder attribute changes |
 | `page.getByTitle()` | Title attribute changes |
 
-Chained locators (`page.locator('#x').getByRole(...)`) are also supported.
+Chained locators work too (e.g. `page.locator('#panel').filter({ hasText: 'Foo' }).getByRole(...)`).
 
 ---
 
-## Architecture
+## Self-Healing in Action
+
+Here are real examples from actual test runs showing each tier of healing.
+
+### Tier 1 — Fuzzy Match (Free, No AI)
+
+When the locator text is close enough (>= 90% similarity), the engine fixes it instantly using Levenshtein distance. No API calls, no cost.
+
+**Role mismatch** — test says `button`, actual element is a `textbox`:
+```
+🔧 [AutoHeal] click() failed for: button named "Title*"
+   ↳ Attempted: getByRole('button', { name: 'Title*', exact: true })
+   ↳ Error: locator.original: Timeout 30000ms exceeded.
+   ↳ Attempting healing (fuzzy pre-check → AI fallback)...
+   ⚡ [Fuzzy] Deterministic match: role="textbox" name="Title*" (similarity: 100%)
+   ✅ [AutoHeal] HEALED! Used: getByRole('textbox', { name: 'Title*', exact: true })
+```
+
+**Wrong role again** — test says `link`, still a `textbox`:
+```
+🔧 [AutoHeal] fill() failed for: link named "Title*"
+   ↳ Attempted: getByRole('link', { name: 'Title*', exact: true })
+   ↳ Error: locator.original: Timeout 30000ms exceeded.
+   ↳ Attempting healing (fuzzy pre-check → AI fallback)...
+   ⚡ [Fuzzy] Deterministic match: role="textbox" name="Title*" (similarity: 100%)
+   ✅ [AutoHeal] HEALED! Used: getByRole('textbox', { name: 'Title*', exact: true })
+```
+
+### Tier 2 — AI Healer (For the Tricky Ones)
+
+When the text has changed enough that fuzzy matching can't confidently pick a winner, the engine sends the DOM elements to OpenAI and lets it figure it out.
+
+**Title attribute changed** — someone renamed `"file"` to `"Image"` in the UI:
+```
+🔧 [AutoHeal] click() failed for: title "Some Shipwreck file"
+   ↳ Attempted: getByTitle('Some Shipwreck file')
+   ↳ Error: locator.original: Timeout 30000ms exceeded.
+   ↳ Attempting healing (fuzzy pre-check → AI fallback)...
+   🤖 AI response: {"index": 45, "confidence": 80, "reasoning": "The title 'Some Shipwreck
+      Image' is similar to the searched title 'Some Shipwreck file', suggesting a possible
+      change in the title text."}
+   🎯 AI suggests: "Some Shipwreck Image" (confidence: 80%)
+   ✅ [AutoHeal] HEALED! Used: getByTitle('Some Shipwreck Image', { exact: true })
+```
+
+**Text content changed** — `"file name"` became `"asset name"`:
+```
+🔧 [AutoHeal] click() failed for: text "Start typing file name..."
+   ↳ Attempted: getByText('Start typing file name...')
+   ↳ Error: locator.original: Timeout 30000ms exceeded.
+   ↳ Attempting healing (fuzzy pre-check → AI fallback)...
+   🤖 AI response: {"index": 65, "confidence": 80, "reasoning": "The text 'Start typing
+      asset name...' is similar in structure and context to the intended text 'Start typing
+      file name...', suggesting a possible change in the text."}
+   🎯 AI suggests text: "Start typing asset name..." (confidence: 80%)
+   ✅ [AutoHeal] HEALED! Used: getByText('Start typing asset name...', { exact: true })
+```
+
+### Tier 3 — Healing Cache (Instant on Re-runs)
+
+Once a locator is healed (by fuzzy or AI), the fix is saved to `.healingCache.json`. Next time the same broken locator is encountered, it's fixed **instantly** — no fuzzy matching, no API calls, zero cost.
+
+```
+🔧 [AutoHeal] click() failed for: button named "Title*"
+   ↳ Attempted: getByRole('button', { name: 'Title*', exact: true })
+   ↳ Error: locator.original: Timeout 30000ms exceeded.
+   📦 [Cache] Found cached healing: getByRole('textbox', { name: 'Title*', exact: true })
+   ✅ [Cache] HEALED from cache! Used: getByRole('textbox', { name: 'Title*', exact: true })
+```
+
+```
+🔧 [AutoHeal] fill() failed for: link named "Title*"
+   ↳ Attempted: getByRole('link', { name: 'Title*', exact: true })
+   ↳ Error: locator.original: Timeout 30000ms exceeded.
+   📦 [Cache] Found cached healing: getByRole('textbox', { name: 'Title*', exact: true })
+   ✅ [Cache] HEALED from cache! Used: getByRole('textbox', { name: 'Title*', exact: true })
+```
+
+---
+
+## Test Dashboard
+
+After each run, the custom reporter generates a JSON file that powers a React dashboard. It shows pass/fail stats, an AI-generated test summary, failure classification by root cause, and a detailed healing log — so you can see exactly what broke and how it was fixed.
+
+![Test Dashboard](docs/dashboard-screenshot.png)
+
+---
+
+## Failure Classifier
+
+Not every failure is a locator problem. Before the engine tries to heal anything, it classifies the error to avoid wasting time (and API calls) on things it can't fix:
+
+| Classification | Healable? | Example |
+|---|---|---|
+| Locator Drift | Yes | `"no element matches locator"` |
+| Timing / Race Condition | Maybe | `"timeout exceeded"` — heals only if locator-related |
+| Overlay / Intercept | No | `"element is intercepted by another element"` |
+| Visibility | No | `"element is not visible"` |
+| Detachment | No | `"element is detached from the DOM"` |
+| Navigation | No | `"page closed"`, `"frame detached"` |
+| Network | No | `"net::ERR_CONNECTION_REFUSED"` |
+
+---
+
+## Project Structure
 
 ```
 playwright-ai-healing-engine/
-├── tests/                      # Playwright test specs
-│   └── saucedemo.spec.js       # Demo tests against SauceDemo.com
-├── pages/                      # Page Object Models
-│   ├── LoginPage.js            # Wires up the healer via LocatorHealer.wrapPage()
+├── tests/                       # Playwright test specs
+│   └── saucedemo.spec.js        # Demo tests against SauceDemo.com
+├── pages/                       # Page Object Models
+│   ├── LoginPage.js             # Wires up the healer via LocatorHealer.wrapPage()
 │   ├── ProductsPage.js
 │   ├── CartPage.js
 │   └── CheckoutPage.js
-├── shared/                     # Core engine (reusable across projects)
+├── shared/                      # Core engine (reusable across projects)
 │   ├── utils/
-│   │   ├── locatorHealer.js    # Self-healing engine (cache → fuzzy → AI)
+│   │   ├── locatorHealer.js     # The self-healing engine
 │   │   └── failureClassifier.js # Classifies errors by root cause
-│   └── reporter.js             # Custom Playwright reporter + AI summary
-├── dashboard/                  # React dashboard (Vite + single-file build)
+│   └── reporter.js              # Custom reporter + AI summary generator
+├── dashboard/                   # React dashboard (Vite + single-file build)
 │   ├── src/
 │   │   ├── App.jsx
-│   │   └── components/         # Header, StatsGrid, DonutChart, AISummary, etc.
+│   │   └── components/
 │   └── public/
-│       └── test-run-data.json  # Generated by reporter after each run
+│       └── test-run-data.json   # Generated after each test run
 ├── playwright.config.js
 ├── package.json
-└── .env.example                # OPENAI_API_KEY goes here
+└── .env.example
 ```
 
 ---
@@ -97,104 +205,38 @@ playwright-ai-healing-engine/
 ### Setup
 
 ```bash
-# Clone the repo
 git clone https://github.com/varunheranjal/playwright-ai-healing-engine.git
 cd playwright-ai-healing-engine
 
-# Install dependencies
 npm install
 cd shared && npm install && cd ..
 npx playwright install chromium
 
-# Configure your API key
 cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Add your OPENAI_API_KEY to .env
 ```
 
-### Run the Tests
+### Run
 
 ```bash
-# Run all tests (headless)
-npm test
-
-# Run headed (watch the browser)
-npm run test:headed
-
-# Debug mode (step through)
-npm run test:debug
-
-# View the HTML report
-npm run report
+npm test              # headless
+npm run test:headed   # watch the browser
+npm run test:debug    # step through with inspector
+npm run report        # open the HTML report
 ```
 
-### View the Dashboard
+### Dashboard
 
 ```bash
 cd dashboard && npm install && npm run dev
 ```
-
-The dashboard reads `test-run-data.json` (generated by the reporter after each test run) and shows:
-- Pass/fail/flaky stats with a donut chart
-- AI-generated test run summary
-- Failed test details with root-cause classification
-- Locator healing log
-
----
-
-## Self-Healing in Action
-
-The demo test suite includes **intentionally drifted locators** to showcase the healer:
-
-| Test | What's Wrong | Healing Strategy |
-|---|---|---|
-| `[HEAL] Drifted button text` | `"Add to Cart"` vs actual `"Add to cart"` | Fuzzy match (case difference) |
-| `[HEAL] Drifted role` | `role="link"` vs actual `role="button"` for Checkout | AI healer (role mismatch) |
-
-When these tests run, the console output shows the healing process:
-
-```
-🔧 [AutoHeal] click() failed for: button named "Add to Cart"
-   ↳ Attempted: getByRole('button', { name: 'Add to Cart', exact: true })
-   🏷️  [Classifier] Locator Drift
-   ⚡ [Fuzzy] Deterministic match: role="button" name="Add to cart" (similarity: 92%)
-   ✅ [AutoHeal] HEALED! Used: getByRole('button', { name: 'Add to cart', exact: true })
-```
-
----
-
-## Failure Classifier
-
-Not every test failure is a locator issue. The classifier inspects the error message and categorizes failures before healing is attempted:
-
-| Classification | Healable? | Example |
-|---|---|---|
-| Locator Drift | Yes | `"no element matches locator"` |
-| Timing / Race Condition | Conditional | `"timeout exceeded"` — heals only if locator-related |
-| Overlay / Intercept | No | `"element is intercepted by another element"` |
-| Visibility | No | `"element is not visible"` |
-| Detachment | No | `"element is detached from the DOM"` |
-| Navigation | No | `"page closed"`, `"frame detached"` |
-| Network | No | `"net::ERR_CONNECTION_REFUSED"` |
-
-This prevents wasted API calls and misleading healing attempts.
-
----
-
-## Custom Reporter
-
-The reporter (`shared/reporter.js`) runs at the end of each test suite and:
-
-1. Writes `.testResultsEnv` with pass/fail counts
-2. Reads the healing log and summarises healings by method (cache / fuzzy / AI)
-3. Sends a structured prompt to OpenAI and generates an AI test run summary
-4. Writes `dashboard/public/test-run-data.json` for the React dashboard
 
 ---
 
 ## Tech Stack
 
 - **Playwright** — browser automation and test runner
-- **OpenAI API** — LLM-powered locator healing and test summaries
+- **OpenAI API** — LLM-powered locator healing and test run summaries
 - **React + Vite** — test results dashboard
 - **Node.js** — runtime
 
