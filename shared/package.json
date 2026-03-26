@@ -1,0 +1,13 @@
+{
+  "name": "ai-healing-shared",
+  "version": "1.0.0",
+  "description": "Shared utilities — locator healing, failure classification, AI reporter, dashboard",
+  "main": "index.js",
+  "scripts": {},
+  "keywords": [],
+  "author": "Varun Heranjal",
+  "license": "MIT",
+  "dependencies": {
+    "openai": "^4.104.0"
+  }
+}

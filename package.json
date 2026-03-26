@@ -1,0 +1,31 @@
+{
+  "name": "playwright-ai-healing-engine",
+  "version": "1.0.0",
+  "description": "AI-powered Playwright framework with self-healing locators",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug",
+    "report": "npx playwright show-report",
+    "dashboard:dev": "cd dashboard && npm run dev",
+    "dashboard:build": "cd dashboard && npm run build"
+  },
+  "keywords": [
+    "playwright",
+    "testing",
+    "ai",
+    "self-healing",
+    "locator",
+    "automation",
+    "openai"
+  ],
+  "author": "Varun Heranjal",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "dotenv": "^16.4.7"
+  },
+  "dependencies": {
+    "openai": "^4.104.0"
+  }
+}

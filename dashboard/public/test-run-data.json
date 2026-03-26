@@ -1,0 +1,64 @@
+{
+  "timestamp": "2026-03-26T19:47:24.459Z",
+  "overallStatus": "passed",
+  "durationMs": 11674,
+  "sites": [
+    "SauceDemo — Self-Healing Demo Tests"
+  ],
+  "stats": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "passRate": "100.0"
+  },
+  "failedTests": [],
+  "flakyTests": [],
+  "testResults": [
+    {
+      "title": "Login with valid credentials",
+      "suite": "SauceDemo — Self-Healing Demo Tests",
+      "outcome": "expected",
+      "duration": 1324,
+      "retries": 0
+    },
+    {
+      "title": "Login with invalid credentials shows error",
+      "suite": "SauceDemo — Self-Healing Demo Tests",
+      "outcome": "expected",
+      "duration": 1238,
+      "retries": 0
+    },
+    {
+      "title": "Add product to cart and verify badge count",
+      "suite": "SauceDemo — Self-Healing Demo Tests",
+      "outcome": "expected",
+      "duration": 1443,
+      "retries": 0
+    },
+    {
+      "title": "Sort products by price low-to-high",
+      "suite": "SauceDemo — Self-Healing Demo Tests",
+      "outcome": "expected",
+      "duration": 1480,
+      "retries": 0
+    },
+    {
+      "title": "Add two items, remove one, verify cart",
+      "suite": "SauceDemo — Self-Healing Demo Tests",
+      "outcome": "expected",
+      "duration": 2167,
+      "retries": 0
+    },
+    {
+      "title": "Complete checkout end-to-end",
+      "suite": "SauceDemo — Self-Healing Demo Tests",
+      "outcome": "expected",
+      "duration": 3036,
+      "retries": 0
+    }
+  ],
+  "aiSummary": null,
+  "healingLogs": []
+}

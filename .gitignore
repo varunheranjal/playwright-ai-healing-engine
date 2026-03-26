@@ -1,0 +1,27 @@
+node_modules/
+shared/node_modules/
+dashboard/node_modules/
+
+# Test artifacts
+test-results/
+playwright-report/
+blob-report/
+
+# Runtime healing files
+shared/.healingLog.json
+shared/.healingCache.json
+
+# Reporter output
+.testResultsEnv
+ai-summary.txt
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
