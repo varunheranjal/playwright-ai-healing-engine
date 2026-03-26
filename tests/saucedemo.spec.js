@@ -1,11 +1,9 @@
-// @ts-check
 const { test, expect } = require('@playwright/test');
 const LoginPage = require('../pages/LoginPage');
 const ProductsPage = require('../pages/ProductsPage');
 const CartPage = require('../pages/CartPage');
 const CheckoutPage = require('../pages/CheckoutPage');
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const STANDARD_USER = 'standard_user';
 const PASSWORD = 'secret_sauce';
 
@@ -25,11 +23,10 @@ async function loginAsStandardUser(page) {
   };
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
 
 test.describe('SauceDemo — Self-Healing Demo Tests', () => {
 
-  // ── 1. Login ────────────────────────────────────────────────────────────────
+  //  1. Login 
   test('Login with valid credentials', async ({ page }) => {
     const { products } = await loginAsStandardUser(page);
     const title = await products.getTitle();
@@ -44,7 +41,7 @@ test.describe('SauceDemo — Self-Healing Demo Tests', () => {
     await expect(error).toContainText('Username and password do not match');
   });
 
-  // ── 2. Products ─────────────────────────────────────────────────────────────
+  //  2. Products 
   test('Add product to cart and verify badge count', async ({ page }) => {
     const { products } = await loginAsStandardUser(page);
     await products.addToCart('Sauce Labs Backpack');
@@ -61,7 +58,7 @@ test.describe('SauceDemo — Self-Healing Demo Tests', () => {
     }
   });
 
-  // ── 3. Cart ─────────────────────────────────────────────────────────────────
+  //  3. Cart 
   test('Add two items, remove one, verify cart', async ({ page }) => {
     const { products, cart } = await loginAsStandardUser(page);
     await products.addToCart('Sauce Labs Backpack');
@@ -78,7 +75,7 @@ test.describe('SauceDemo — Self-Healing Demo Tests', () => {
     expect(names).toEqual(['Sauce Labs Bike Light']);
   });
 
-  // ── 4. Full checkout ───────────────────────────────────────────────────────
+  //  4. Full checkout 
   test('Complete checkout end-to-end', async ({ page }) => {
     const { products, cart, checkout } = await loginAsStandardUser(page);
     await products.addToCart('Sauce Labs Backpack');
@@ -91,22 +88,22 @@ test.describe('SauceDemo — Self-Healing Demo Tests', () => {
     await expect(header).toHaveText('Thank you for your order!');
   });
 
-  // ── 5. Intentionally DRIFTED locator — showcases the healer ────────────
+  //  5. Intentionally DRIFTED locator .. showcases the healer 
   //    The button text on the site is "Add to cart" but we deliberately use
-  //    "Add to Cart" (capital C). The fuzzy matcher / AI healer should
+  //    "Add to Carts" (capital C and plural). The fuzzy matcher / AI healer should
   //    correct this at runtime and the test should still pass.
   test('[HEAL] Drifted button text — "Add to Cart" vs "Add to cart"', async ({ page }) => {
     const { products } = await loginAsStandardUser(page);
 
-    // Intentionally wrong casing — should trigger healing
+    // Intentionally wrong casing ...should trigger healing
     const product = page.locator('.inventory_item').filter({ hasText: 'Sauce Labs Onesie' });
-    await product.getByRole('button', { name: 'Add to Cart' }).click();
+    await product.getByRole('button', { name: 'Add to Carts' }).click();
 
     const badge = await products.getCartBadgeCount();
     await expect(badge).toHaveText('1');
   });
 
-  // ── 6. Intentionally DRIFTED locator — wrong role ──────────────────────
+  //  6. Intentionally DRIFTED locator... wrong role 
   //    We look for role="link" named "Checkout" but the actual element is
   //    a <button> (role="button"). The AI healer should fix the role mismatch.
   test('[HEAL] Drifted role — link vs button for Checkout', async ({ page }) => {
@@ -114,7 +111,7 @@ test.describe('SauceDemo — Self-Healing Demo Tests', () => {
     await products.addToCart('Sauce Labs Bolt T-Shirt');
     await products.goToCart();
 
-    // Intentionally wrong role — should trigger healing
+    // Intentionally wrong role.. should trigger healing
     await page.getByRole('link', { name: 'Checkout' }).click();
 
     await expect(page.locator('.title')).toHaveText('Checkout: Your Information');

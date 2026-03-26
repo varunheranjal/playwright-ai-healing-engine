@@ -80,16 +80,32 @@ class LocatorHealer {
     /**
      * Try the cached healing for this locator. Returns a Playwright locator or null.
      */
-    _tryHealingCache(type, params) {
+    /**
+     * Build a scope-aware method map. When a `scope` object is provided (from a
+     * child/chained locator), its methods take precedence so the healed locator
+     * stays scoped to the parent rather than the full page.
+     */
+    _getScopedMethods(scope) {
+        return {
+            getByRole: scope?.getByRole || this._originalGetByRole || this.page.getByRole.bind(this.page),
+            getByText: scope?.getByText || this._originalGetByText || this.page.getByText.bind(this.page),
+            getByLabel: scope?.getByLabel || this._originalGetByLabel || this.page.getByLabel.bind(this.page),
+            getByPlaceholder: scope?.getByPlaceholder || this._originalGetByPlaceholder || this.page.getByPlaceholder.bind(this.page),
+            getByTitle: scope?.getByTitle || this._originalGetByTitle || this.page.getByTitle.bind(this.page),
+        };
+    }
+
+    _tryHealingCache(type, params, scope = null) {
         const key = LocatorHealer._cacheKey(type, params);
         const cached = this._healingCache[key];
         if (!cached) return null;
 
+        const m = this._getScopedMethods(scope);
         console.log(`   📦 [Cache] Found cached healing: ${cached.strategy}`);
         try {
             if (cached.type === 'role') {
                 return {
-                    locator: (this._originalGetByRole || this.page.getByRole.bind(this.page))(cached.healedRole, { name: cached.healedName, exact: true }),
+                    locator: m.getByRole(cached.healedRole, { name: cached.healedName, exact: true }),
                     strategy: cached.strategy,
                     healedRole: cached.healedRole,
                     healedName: cached.healedName,
@@ -99,10 +115,10 @@ class LocatorHealer {
                 };
             } else {
                 const methodMap = {
-                    text: this._originalGetByText || this.page.getByText.bind(this.page),
-                    label: this._originalGetByLabel || this.page.getByLabel.bind(this.page),
-                    placeholder: this._originalGetByPlaceholder || this.page.getByPlaceholder.bind(this.page),
-                    title: this._originalGetByTitle || this.page.getByTitle.bind(this.page),
+                    text: m.getByText,
+                    label: m.getByLabel,
+                    placeholder: m.getByPlaceholder,
+                    title: m.getByTitle,
                 };
                 const method = methodMap[cached.type];
                 if (!method) return null;
@@ -144,7 +160,7 @@ class LocatorHealer {
      * Search the accessibility tree for a fuzzy role+name match.
      * Returns a healed result if similarity ≥ 90%, else null.
      */
-    _fuzzyMatchRole(candidates, role, name) {
+    _fuzzyMatchRole(candidates, role, name, scope = null) {
         if (!name) return null;
         let bestMatch = null;
         let bestScore = 0;
@@ -166,7 +182,8 @@ class LocatorHealer {
         const nameSim = LocatorHealer._similarity(name, bestMatch.name);
         console.log(`   ⚡ [Fuzzy] Deterministic match: role="${bestMatch.role}" name="${bestMatch.name}" (similarity: ${(nameSim * 100).toFixed(0)}%)`);
 
-        const locator = (this._originalGetByRole || this.page.getByRole.bind(this.page))(bestMatch.role, { name: bestMatch.name, exact: true });
+        const m = this._getScopedMethods(scope);
+        const locator = m.getByRole(bestMatch.role, { name: bestMatch.name, exact: true });
         return {
             locator,
             strategy: `getByRole('${bestMatch.role}', { name: '${bestMatch.name}', exact: true })`,
@@ -218,15 +235,13 @@ class LocatorHealer {
         return { file: 'unknown', line: 0 };
     }
 
-    async _aiHealRole({ role, name, action, desc }) {
+    async _aiHealRole({ role, name, action, desc, scope = null }) {
         try {
-            const accessibilityTree = await this.page.accessibility.snapshot();
-            if (!accessibilityTree) {
-                console.log(`   ⚠️  Could not retrieve accessibility tree`);
+            const elements = await this._getAccessibleElements();
+            if (!elements || elements.length === 0) {
+                console.log(`   ⚠️  Could not retrieve accessible elements from the page`);
                 return null;
             }
-
-            const elements = this._flattenAccessibilityTree(accessibilityTree);
 
             // Include all interactive roles so the AI can heal across role mismatches
             const interactiveRoles = new Set([
@@ -238,7 +253,7 @@ class LocatorHealer {
             );
 
             // ── Fuzzy pre-check: try deterministic match before calling AI ──
-            const fuzzyResult = this._fuzzyMatchRole(candidates, role, name);
+            const fuzzyResult = this._fuzzyMatchRole(candidates, role, name, scope);
             if (fuzzyResult) return fuzzyResult;
 
             const candidateSummary = candidates.map((el, i) =>
@@ -297,8 +312,8 @@ If no element is a reasonable match, respond with:
             console.log(`   🎯 AI suggests: role="${matchedElement.role}" name="${matchedElement.name}" (confidence: ${result.confidence}%)`);
             console.log(`   💡 Reasoning: ${result.reasoning}`);
 
-            const getByRole = this._originalGetByRole || this.page.getByRole.bind(this.page);
-            const healedLocator = getByRole(matchedElement.role, {
+            const m = this._getScopedMethods(scope);
+            const healedLocator = m.getByRole(matchedElement.role, {
                 name: matchedElement.name,
                 exact: true,
             });
@@ -318,22 +333,21 @@ If no element is a reasonable match, respond with:
     }
 
 
-    async _aiHealText({ text, exact, action, desc }) {
+    async _aiHealText({ text, exact, action, desc, scope = null }) {
         try {
-            const accessibilityTree = await this.page.accessibility.snapshot();
-            if (!accessibilityTree) {
-                console.log(`   ⚠️  Could not retrieve accessibility tree`);
+            const elements = await this._getAccessibleElements();
+            if (!elements || elements.length === 0) {
+                console.log(`   ⚠️  Could not retrieve accessible elements from the page`);
                 return null;
             }
 
-            const elements = this._flattenAccessibilityTree(accessibilityTree);
             const candidates = elements.filter(el => el.name && el.name.trim().length > 0);
 
             // ── Fuzzy pre-check: try deterministic match before calling AI ──
             const fuzzyResult = this._fuzzyMatchText(candidates, text);
             if (fuzzyResult) {
-                const getByText = this._originalGetByText || this.page.getByText.bind(this.page);
-                const healedLocator = getByText(fuzzyResult.matchedValue, { exact: true });
+                const m = this._getScopedMethods(scope);
+                const healedLocator = m.getByText(fuzzyResult.matchedValue, { exact: true });
                 return {
                     locator: healedLocator,
                     strategy: `getByText('${fuzzyResult.matchedValue}', { exact: true })`,
@@ -397,8 +411,8 @@ If no element is a reasonable match, respond with:
             console.log(`   🎯 AI suggests text: "${matchedElement.name}" (confidence: ${result.confidence}%)`);
             console.log(`   💡 Reasoning: ${result.reasoning}`);
 
-            const getByText = this._originalGetByText || this.page.getByText.bind(this.page);
-            const healedLocator = getByText(matchedElement.name, { exact: true });
+            const m = this._getScopedMethods(scope);
+            const healedLocator = m.getByText(matchedElement.name, { exact: true });
 
             return {
                 locator: healedLocator,
@@ -419,7 +433,7 @@ If no element is a reasonable match, respond with:
      * Reads actual DOM attributes (title, placeholder, label text) instead of the
      * accessibility tree, since those attributes don't always map to accessible names.
      */
-    async _aiHealGeneric({ strategy, searchText, exact, action, desc }) {
+    async _aiHealGeneric({ strategy, searchText, exact, action, desc, scope = null }) {
         try {
             // Collect candidates directly from the DOM based on strategy
             const candidates = await this.page.evaluate((strat) => {
@@ -478,10 +492,11 @@ If no element is a reasonable match, respond with:
             // ── Fuzzy pre-check: try deterministic match before calling AI ──
             const fuzzyResult = this._fuzzyMatchText(candidates, searchText);
             if (fuzzyResult) {
+                const m = this._getScopedMethods(scope);
                 const methodMap = {
-                    label: this._originalGetByLabel || this.page.getByLabel.bind(this.page),
-                    placeholder: this._originalGetByPlaceholder || this.page.getByPlaceholder.bind(this.page),
-                    title: this._originalGetByTitle || this.page.getByTitle.bind(this.page),
+                    label: m.getByLabel,
+                    placeholder: m.getByPlaceholder,
+                    title: m.getByTitle,
                 };
                 const method = methodMap[strategy];
                 const healedLocator = method(fuzzyResult.matchedValue, { exact: true });
@@ -551,13 +566,14 @@ If no element is a reasonable match, respond with:
             console.log(`   💡 Reasoning: ${result.reasoning}`);
 
             // Build the healed locator using the actual DOM attribute value
+            const m = this._getScopedMethods(scope);
             let healedLocator;
             if (strategy === 'label') {
-                healedLocator = (this._originalGetByLabel || this.page.getByLabel.bind(this.page))(matchedValue, { exact: true });
+                healedLocator = m.getByLabel(matchedValue, { exact: true });
             } else if (strategy === 'placeholder') {
-                healedLocator = (this._originalGetByPlaceholder || this.page.getByPlaceholder.bind(this.page))(matchedValue, { exact: true });
+                healedLocator = m.getByPlaceholder(matchedValue, { exact: true });
             } else {
-                healedLocator = (this._originalGetByTitle || this.page.getByTitle.bind(this.page))(matchedValue, { exact: true });
+                healedLocator = m.getByTitle(matchedValue, { exact: true });
             }
 
             return {
@@ -574,20 +590,80 @@ If no element is a reasonable match, respond with:
     }
 
 
-    _flattenAccessibilityTree(node, result = []) {
-        if (node.name || node.role !== 'generic') {
-            result.push({
-                role: node.role,
-                name: node.name || '',
-                description: node.description || '',
+    /**
+     * Collect interactive elements from the DOM via page.evaluate().
+     * Replaces the deprecated page.accessibility.snapshot() API (removed in Playwright 1.56+).
+     */
+    async _getAccessibleElements() {
+        return this.page.evaluate(() => {
+            const results = [];
+            // Map HTML tags / attributes to implicit ARIA roles
+            const implicitRoles = {
+                A: (el) => el.hasAttribute('href') ? 'link' : null,
+                BUTTON: () => 'button',
+                INPUT: (el) => {
+                    const type = (el.getAttribute('type') || 'text').toLowerCase();
+                    if (type === 'checkbox') return 'checkbox';
+                    if (type === 'radio') return 'radio';
+                    if (type === 'submit' || type === 'reset' || type === 'button') return 'button';
+                    return 'textbox';
+                },
+                SELECT: () => 'combobox',
+                TEXTAREA: () => 'textbox',
+                OPTION: () => 'option',
+            };
+
+            const getRole = (el) => {
+                const explicit = el.getAttribute('role');
+                if (explicit) return explicit;
+                const fn = implicitRoles[el.tagName];
+                return fn ? fn(el) : null;
+            };
+
+            const getName = (el) => {
+                // aria-label takes precedence
+                const ariaLabel = el.getAttribute('aria-label');
+                if (ariaLabel) return ariaLabel.trim();
+                // aria-labelledby
+                const labelledBy = el.getAttribute('aria-labelledby');
+                if (labelledBy) {
+                    const parts = labelledBy.split(/\s+/).map(id => {
+                        const ref = document.getElementById(id);
+                        return ref ? ref.textContent.trim() : '';
+                    }).filter(Boolean);
+                    if (parts.length) return parts.join(' ');
+                }
+                // For inputs, check associated <label>
+                if (el.id) {
+                    const label = document.querySelector(`label[for="${el.id}"]`);
+                    if (label) return label.textContent.trim();
+                }
+                // title attribute
+                const title = el.getAttribute('title');
+                if (title) return title.trim();
+                // value for submit/reset buttons
+                if (el.tagName === 'INPUT' && ['submit', 'reset', 'button'].includes((el.type || '').toLowerCase())) {
+                    return (el.value || '').trim();
+                }
+                // Inner text (for buttons, links, etc.)
+                const text = el.textContent?.trim();
+                return text || '';
+            };
+
+            // Query all potentially interactive elements
+            const selector = 'a, button, input, select, textarea, [role]';
+            document.querySelectorAll(selector).forEach(el => {
+                const role = getRole(el);
+                if (!role) return;
+                const name = getName(el);
+                results.push({
+                    role,
+                    name,
+                    description: el.getAttribute('aria-description') || '',
+                });
             });
-        }
-        if (node.children) {
-            for (const child of node.children) {
-                this._flattenAccessibilityTree(child, result);
-            }
-        }
-        return result;
+            return results;
+        });
     }
 
 
@@ -734,7 +810,22 @@ If no element is a reasonable match, respond with:
     _patchChildGetByMethods(locator) {
         const healer = this;
 
+        // Save originals BEFORE patching — these become the scope for child healing,
+        // so healed locators stay scoped to this parent instead of the full page.
         const origGetByRole = locator.getByRole.bind(locator);
+        const origGetByText = locator.getByText.bind(locator);
+        const origGetByLabel = locator.getByLabel.bind(locator);
+        const origGetByPlaceholder = locator.getByPlaceholder.bind(locator);
+        const origGetByTitle = locator.getByTitle.bind(locator);
+
+        const scope = {
+            getByRole: origGetByRole,
+            getByText: origGetByText,
+            getByLabel: origGetByLabel,
+            getByPlaceholder: origGetByPlaceholder,
+            getByTitle: origGetByTitle,
+        };
+
         locator.getByRole = (role, options = {}) => {
             const child = origGetByRole(role, options);
             const callerLocation = healer._getCallerLocation();
@@ -742,47 +833,43 @@ If no element is a reasonable match, respond with:
                 role,
                 name: options.name,
                 exact: options.exact !== undefined ? options.exact : true,
-            }, callerLocation);
+            }, callerLocation, scope);
         };
 
-        const origGetByText = locator.getByText.bind(locator);
         locator.getByText = (text, options = {}) => {
             const child = origGetByText(text, options);
             const callerLocation = healer._getCallerLocation();
             return healer._createHealingLocator(child, 'text', {
                 text,
                 exact: options.exact || false,
-            }, callerLocation);
+            }, callerLocation, scope);
         };
 
-        const origGetByLabel = locator.getByLabel.bind(locator);
         locator.getByLabel = (label, options = {}) => {
             const child = origGetByLabel(label, options);
             const callerLocation = healer._getCallerLocation();
             return healer._createHealingLocator(child, 'label', {
                 label,
                 exact: options.exact || false,
-            }, callerLocation);
+            }, callerLocation, scope);
         };
 
-        const origGetByPlaceholder = locator.getByPlaceholder.bind(locator);
         locator.getByPlaceholder = (placeholder, options = {}) => {
             const child = origGetByPlaceholder(placeholder, options);
             const callerLocation = healer._getCallerLocation();
             return healer._createHealingLocator(child, 'placeholder', {
                 placeholder,
                 exact: options.exact || false,
-            }, callerLocation);
+            }, callerLocation, scope);
         };
 
-        const origGetByTitle = locator.getByTitle.bind(locator);
         locator.getByTitle = (title, options = {}) => {
             const child = origGetByTitle(title, options);
             const callerLocation = healer._getCallerLocation();
             return healer._createHealingLocator(child, 'title', {
                 title,
                 exact: options.exact || false,
-            }, callerLocation);
+            }, callerLocation, scope);
         };
 
         // Also patch .locator() on children so nested chains work:
@@ -792,6 +879,19 @@ If no element is a reasonable match, respond with:
             const child = origLocator(selector, options);
             return healer._patchChildGetByMethods(child);
         };
+
+        // Patch chain methods (filter, first, last, nth, and, or) so the
+        // returned locator also carries the healing patches.
+        // e.g. page.locator('#x').filter({ hasText: 'Y' }).getByRole(...)
+        const chainMethods = ['filter', 'first', 'last', 'nth', 'and', 'or'];
+        for (const method of chainMethods) {
+            if (typeof locator[method] !== 'function') continue;
+            const orig = locator[method].bind(locator);
+            locator[method] = (...args) => {
+                const child = orig(...args);
+                return healer._patchChildGetByMethods(child);
+            };
+        }
 
         return locator;
     }
@@ -830,7 +930,7 @@ If no element is a reasonable match, respond with:
      * trigger AI healing automatically. The locator remains a real Locator object,
      * so expect(locator).toBeVisible() and all other Playwright APIs work normally.
      */
-    _createHealingLocator(locator, type, params, callerLocation) {
+    _createHealingLocator(locator, type, params, callerLocation, scope = null) {
         const healer = this;
         const actionMethods = [
             'click', 'dblclick', 'fill', 'type', 'press',
@@ -857,7 +957,7 @@ If no element is a reasonable match, respond with:
                 } catch (originalError) {
                     // Pass the original user args (without injected timeout) to autoHeal
                     // so the healed retry respects whatever timeout the caller intended.
-                    return healer._autoHeal(locator, method, args, type, params, callerLocation, originalError);
+                    return healer._autoHeal(locator, method, args, type, params, callerLocation, originalError, scope);
                 }
             };
         }
@@ -883,7 +983,7 @@ If no element is a reasonable match, respond with:
     /**
      * Internal: called by the healing proxy when an action method fails.
      */
-    async _autoHeal(originalLocator, methodName, methodArgs, type, params, callerLocation, originalError) {
+    async _autoHeal(originalLocator, methodName, methodArgs, type, params, callerLocation, originalError, scope = null) {
         const descMap = {
             role: () => `${params.role} named "${params.name}"`,
             text: () => `text "${params.text}"`,
@@ -929,7 +1029,7 @@ If no element is a reasonable match, respond with:
         }
 
         // ── Step 1: Try healing cache first (instant, no API call) ──
-        const cachedResult = this._tryHealingCache(type, params);
+        const cachedResult = this._tryHealingCache(type, params, scope);
         if (cachedResult) {
             try {
                 const result = await cachedResult.locator[methodName](...methodArgs);
@@ -971,13 +1071,13 @@ If no element is a reasonable match, respond with:
 
         let healedResult;
         if (type === 'role') {
-            healedResult = await this._aiHealRole({ role: params.role, name: params.name, action: methodName, desc });
+            healedResult = await this._aiHealRole({ role: params.role, name: params.name, action: methodName, desc, scope });
         } else if (type === 'text') {
-            healedResult = await this._aiHealText({ text: params.text, exact: params.exact, action: methodName, desc });
+            healedResult = await this._aiHealText({ text: params.text, exact: params.exact, action: methodName, desc, scope });
         } else {
             // label, placeholder, title
             const searchText = params.label || params.placeholder || params.title;
-            healedResult = await this._aiHealGeneric({ strategy: type, searchText, exact: params.exact, action: methodName, desc });
+            healedResult = await this._aiHealGeneric({ strategy: type, searchText, exact: params.exact, action: methodName, desc, scope });
         }
 
         if (healedResult) {

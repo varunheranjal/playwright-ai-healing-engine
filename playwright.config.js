@@ -1,7 +1,7 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ override: true });
 
 module.exports = defineConfig({
   testDir: './tests',

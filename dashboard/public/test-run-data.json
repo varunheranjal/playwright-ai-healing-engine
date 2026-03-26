@@ -1,13 +1,13 @@
 {
-  "timestamp": "2026-03-26T19:47:24.459Z",
+  "timestamp": "2026-03-26T20:17:39.565Z",
   "overallStatus": "passed",
-  "durationMs": 11674,
+  "durationMs": 79904,
   "sites": [
     "SauceDemo — Self-Healing Demo Tests"
   ],
   "stats": {
-    "total": 6,
-    "passed": 6,
+    "total": 8,
+    "passed": 8,
     "failed": 0,
     "skipped": 0,
     "flaky": 0,
@@ -20,45 +20,94 @@
       "title": "Login with valid credentials",
       "suite": "SauceDemo — Self-Healing Demo Tests",
       "outcome": "expected",
-      "duration": 1324,
+      "duration": 1872,
       "retries": 0
     },
     {
       "title": "Login with invalid credentials shows error",
       "suite": "SauceDemo — Self-Healing Demo Tests",
       "outcome": "expected",
-      "duration": 1238,
+      "duration": 1594,
       "retries": 0
     },
     {
       "title": "Add product to cart and verify badge count",
       "suite": "SauceDemo — Self-Healing Demo Tests",
       "outcome": "expected",
-      "duration": 1443,
+      "duration": 1806,
       "retries": 0
     },
     {
       "title": "Sort products by price low-to-high",
       "suite": "SauceDemo — Self-Healing Demo Tests",
       "outcome": "expected",
-      "duration": 1480,
+      "duration": 1830,
       "retries": 0
     },
     {
       "title": "Add two items, remove one, verify cart",
       "suite": "SauceDemo — Self-Healing Demo Tests",
       "outcome": "expected",
-      "duration": 2167,
+      "duration": 2600,
       "retries": 0
     },
     {
       "title": "Complete checkout end-to-end",
       "suite": "SauceDemo — Self-Healing Demo Tests",
       "outcome": "expected",
-      "duration": 3036,
+      "duration": 3960,
+      "retries": 0
+    },
+    {
+      "title": "[HEAL] Drifted button text — \"Add to Cart\" vs \"Add to cart\"",
+      "suite": "SauceDemo — Self-Healing Demo Tests",
+      "outcome": "expected",
+      "duration": 32071,
+      "retries": 0
+    },
+    {
+      "title": "[HEAL] Drifted role — link vs button for Checkout",
+      "suite": "SauceDemo — Self-Healing Demo Tests",
+      "outcome": "expected",
+      "duration": 32766,
       "retries": 0
     }
   ],
-  "aiSummary": null,
-  "healingLogs": []
+  "aiSummary": "### Test Run Summary\n\n1. **Overall Health**  \nThe test run is in excellent health with a 100% pass rate and no critical failures.\n\n2. **Failure Analysis**  \nThere are no failures to report in this test run, as all tests passed successfully.\n\n3. **Flaky Tests**  \nThere are no flaky tests identified in this run, indicating stability in the tests executed.\n\n4. **Self-Healed Locators**  \nTwo locators were self-healed during this run, indicating adjustments were necessary:\n\n   - **Button named \"Add to Carts\"**  \n     - Original: `getByRole('button', { name: 'Add to Carts' })`  \n     - Healed to: `getByRole('button', { name: 'Add to cart', exact: true })`  \n     - File: `saucedemo.spec.js`  \n     - Line: 100  \n     - Change Diagnosis: The healing appears to be due to a name mismatch, correcting the spelling to match the UI.\n\n   - **Link named \"Checkout\"**  \n     - Original: `getByRole('link', { name: 'Checkout' })`  \n     - Healed to: `getByRole('button', { name: 'Checkout', exact: true })`  \n     - File: `saucedemo.spec.js`  \n     - Line: 115  \n     - Change Diagnosis: The locator was adjusted from a link to a button, indicating a genuine UI change in the application.",
+  "healingLogs": [
+    {
+      "timestamp": "2026-03-26T20:17:00.401Z",
+      "type": "role",
+      "original": {
+        "role": "button",
+        "name": "Add to Carts"
+      },
+      "healed": "getByRole('button', { name: 'Add to cart', exact: true })",
+      "healedRole": "button",
+      "healedName": "Add to cart",
+      "confidence": 92,
+      "reasoning": "Cached healing from 2026-03-26T20:14:20.193Z",
+      "description": "button named \"Add to Carts\"",
+      "sourceFile": "/Users/varunheranjal/Desktop/playwright-ai-healing-engine/tests/saucedemo.spec.js",
+      "sourceLine": 100,
+      "fromCache": true
+    },
+    {
+      "timestamp": "2026-03-26T20:17:33.230Z",
+      "type": "role",
+      "original": {
+        "role": "link",
+        "name": "Checkout"
+      },
+      "healed": "getByRole('button', { name: 'Checkout', exact: true })",
+      "healedRole": "button",
+      "healedName": "Checkout",
+      "confidence": 100,
+      "reasoning": "Cached healing from 2026-03-26T20:14:53.174Z",
+      "description": "link named \"Checkout\"",
+      "sourceFile": "/Users/varunheranjal/Desktop/playwright-ai-healing-engine/tests/saucedemo.spec.js",
+      "sourceLine": 115,
+      "fromCache": true
+    }
+  ]
 }

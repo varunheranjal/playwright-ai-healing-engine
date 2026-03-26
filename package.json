@@ -7,7 +7,7 @@
     "test:headed": "npx playwright test --headed",
     "test:debug": "npx playwright test --debug",
     "report": "npx playwright show-report",
-    "dashboard:dev": "cd dashboard && npm run dev",
+    "dashboard": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build"
   },
   "keywords": [

@@ -1,0 +1,36 @@
+[
+  {
+    "timestamp": "2026-03-26T20:17:00.401Z",
+    "type": "role",
+    "original": {
+      "role": "button",
+      "name": "Add to Carts"
+    },
+    "healed": "getByRole('button', { name: 'Add to cart', exact: true })",
+    "healedRole": "button",
+    "healedName": "Add to cart",
+    "confidence": 92,
+    "reasoning": "Cached healing from 2026-03-26T20:14:20.193Z",
+    "description": "button named \"Add to Carts\"",
+    "sourceFile": "/Users/varunheranjal/Desktop/playwright-ai-healing-engine/tests/saucedemo.spec.js",
+    "sourceLine": 100,
+    "fromCache": true
+  },
+  {
+    "timestamp": "2026-03-26T20:17:33.230Z",
+    "type": "role",
+    "original": {
+      "role": "link",
+      "name": "Checkout"
+    },
+    "healed": "getByRole('button', { name: 'Checkout', exact: true })",
+    "healedRole": "button",
+    "healedName": "Checkout",
+    "confidence": 100,
+    "reasoning": "Cached healing from 2026-03-26T20:14:53.174Z",
+    "description": "link named \"Checkout\"",
+    "sourceFile": "/Users/varunheranjal/Desktop/playwright-ai-healing-engine/tests/saucedemo.spec.js",
+    "sourceLine": 115,
+    "fromCache": true
+  }
+]
